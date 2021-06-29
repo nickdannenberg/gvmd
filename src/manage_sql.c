@@ -21265,15 +21265,6 @@ report_add_result (report_t report, result_t result)
        report, report, result);
 
   report_add_result_for_buffer (report, result);
-
-  sql ("UPDATE report_counts"
-       " SET end_time = (SELECT coalesce(min(overrides.end_time), 0)"
-       "                 FROM overrides, results"
-       "                 WHERE overrides.nvt = results.nvt"
-       "                 AND results.report = %llu"
-       "                 AND overrides.end_time >= m_now ())"
-       " WHERE report = %llu AND override = 1;",
-       report, report);
 }
 
 /**
@@ -29464,6 +29455,15 @@ parse_osp_report (task_t task, report_t report, const char *report_xml)
       g_free (severity_str);
       results = next_entities (results);
     }
+
+  sql ("UPDATE report_counts"
+       " SET end_time = (SELECT coalesce(min(overrides.end_time), 0)"
+       "                 FROM overrides, results"
+       "                 WHERE overrides.nvt = results.nvt"
+       "                 AND results.report = %llu"
+       "                 AND overrides.end_time >= m_now ())"
+       " WHERE report = %llu AND override = 1;",
+       report, report);
 
  end_parse_osp_report:
   sql_commit ();
