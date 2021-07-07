@@ -17805,9 +17805,12 @@ set_task_requested (task_t task, task_status_t *status)
   assert ((task != current_scanner_task) && (global_current_report == 0));
 
   /* Locking here prevents another process from starting the task
-   * concurrently. */
+   * concurrently.
+   *
+   * SELECT FOR UPDATE locks only the relevant rows and not the whole table
+   */
   sql_begin_immediate ();
-  if (sql_error ("LOCK table tasks IN ACCESS EXCLUSIVE MODE;"))
+  if (sql_error ("SELECT id FROM tasks WHERE id = %llu FOR UPDATE;", task))
     {
       sql_rollback ();
       return 1;
@@ -24822,9 +24825,11 @@ delete_report (const char *report_id, int dummy)
    * a reference to the report ID, and then using that reference to try access
    * the deleted report.
    *
+   * SELECT FOR UPDATE locks only the relevant rows and not the whole table
+   *
    * If the report is running already then delete_report_internal will
    * ROLLBACK. */
-  sql ("LOCK table reports IN ACCESS EXCLUSIVE MODE;");
+  sql ("SELECT id FROM reports WHERE uuid = '%s' FOR UPDATE;", report);
 
   if (acl_user_may ("delete_report") == 0)
     {
@@ -29822,9 +29827,12 @@ delete_task_lock (task_t task, int ultimate)
    * a reference to a report ID or the task ID, and then using that
    * reference to try access the deleted report or task.
    *
+   * SELECT FOR UPDATE locks only reports for the task to be deleted
+   * and not the whole table to prevent deadlocks.
+   *
    * If the task is already active then delete_report (via delete_task)
    * will fail and rollback. */
-  if (sql_error ("LOCK table reports IN ACCESS EXCLUSIVE MODE;"))
+  if (sql_error ("SELECT task FROM reports WHERE task = %llu FOR UPDATE;", task))
     {
       sql_rollback ();
       return -1;
@@ -29992,9 +30000,12 @@ request_delete_task_uuid (const char *task_id, int ultimate)
              * getting a reference to a report ID or the task ID, and then using
              * that reference to try access the deleted report or task.
              *
+             * SELECT FOR UPDATE locks only reports for the task to be deleted
+             * and not the whole table to prevent deadlocks.
+             *
              * If the task is running already then delete_task will lead to
              * ROLLBACK. */
-            sql ("LOCK table reports IN ACCESS EXCLUSIVE MODE;");
+            sql ("SELECT task FROM reports WHERE task = %llu FOR UPDATE;", task);
 
           ret = delete_task (task, ultimate);
           if (ret)
